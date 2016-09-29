@@ -67,6 +67,24 @@ public class DnsClient {
 		
 		//TODO: create the data to be send according to the DNS request specification
 		
+		//HEADER
+		byte[] ID = new byte[2];	//random number
+		byte[] H2 = new byte[2];
+		
+		byte[] QDCOUNT = new byte[2];
+		QDCOUNT[0] = (byte) 0;
+		QDCOUNT[1] = (byte) 1;
+		
+		byte[] ANCOUNT = new byte[2];
+		
+		byte[] NSCOUNT = new byte[2];
+		
+		byte[] ARCOUNT = new byte[2];
+		
+		//DNS QUESTION
+		
+		
+		
 		//create client socket
 		DatagramSocket clientSocket = new DatagramSocket();
 		
