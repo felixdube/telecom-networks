@@ -12,21 +12,21 @@ import java.net.*;
 
 public class DnsClient {
 	
-	static String server;
+	static byte[] server;
 	static String name;
 	static String recordType = "A";
 	static Integer timeout = 5;
 	static Integer maxRetries = 3;
 	static Integer port = 53;
 	
-	public static void main(String[] args) {
+	public static void main(String[] args) throws Exception {
 		
 		//Parse user input
 		for(String s: args){
 			switch(s.substring(0, 1)){
 				case "@":
 					String serverName[] = s.split(" ");
-					server = serverName[0];
+					server = serverName[0].getBytes();
 					name = serverName[1];
 					break;
 				
@@ -65,7 +65,34 @@ public class DnsClient {
 			}
 		}
 		
-	
+		//TODO: create the data to be send according to the DNS request specification
+		
+		//create client socket
+		DatagramSocket clientSocket = new DatagramSocket();
+		
+		InetAddress IPAddress = InetAddress.getByAddress(server);
+		
+		byte[] sendData = new byte[1024];
+		byte[] receiveData = new byte[1024];
+		
+		//create datagram
+		DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, port);
+		
+		//send datagram
+		clientSocket.send(sendPacket);
+		
+		DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+		
+		//read datagram from server
+		clientSocket.receive(receivePacket);
+		
+		String modifiedSentence = new String(receivePacket.getData());
+		
+		//TODO: parse packet received accoding to the lab specification
+		
+		
+		
+		
 		
 	}
 }
