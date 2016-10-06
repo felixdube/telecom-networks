@@ -29,7 +29,12 @@ public class DnsClient {
 	static byte[] sendData = new byte[1024];
 	static byte[] receiveData = new byte[1024];
 	
+	
 	public static void main(String[] args) throws Exception {
+		
+		/************************************/
+		/******** USER INPUT PARSING ********/
+		/************************************/
 		
 		for(String s: args){
 			i++;
@@ -248,6 +253,10 @@ public class DnsClient {
 		
 		
 		
+		/*********************************/
+		/******** SENDING PACKETS ********/
+		/*********************************/
+		
 		//create client socket
 		DatagramSocket clientSocket = new DatagramSocket();
 		
@@ -267,6 +276,7 @@ public class DnsClient {
 		String modifiedSentence = new String(receivePacket.getData());
 		
 		System.out.println(modifiedSentence);
+		
 		
 		/** QUERY SUMMARY **/
 		
