@@ -24,24 +24,24 @@ public class DnsClient {
 	static Integer i=0;
 	static Integer p=1;
 	static String[] labels; 
+	static String[] serverS;
+	static byte[] serverB = new byte[4];
 	
-	static int sendDataIndex = 0;
+	static int sendDataIndex = -1;
 	static byte[] sendData = new byte[1024];
 	static byte[] receiveData = new byte[1024];
 	
-	
 	public static void main(String[] args) throws Exception {
-		
-		/************************************/
-		/******** USER INPUT PARSING ********/
-		/************************************/
 		
 		for(String s: args){
 			i++;
 			if (p==1){
 			switch(s.substring(0, 1)){
 				case "@":
-					server = args[i-1].substring(1).getBytes();
+					serverS = args[i-1].substring(1).split("\\.");
+					for (int z=0; z<4; z++){
+					serverB[z]=(byte)Integer.parseInt(serverS[z]);
+					}
 					name = args[i];
 					System.out.println(server);
 					System.out.println(name);
@@ -204,8 +204,6 @@ public class DnsClient {
 			for(int i = 0; i< labelLength; i++){
 				sendData[sendDataIndex++] = (byte) s.charAt(i);
 			}
-			
-			sendData[sendDataIndex++] = 0;
 		}
 		
 		//TODO
@@ -253,10 +251,6 @@ public class DnsClient {
 		
 		
 		
-		/*********************************/
-		/******** SENDING PACKETS ********/
-		/*********************************/
-		
 		//create client socket
 		DatagramSocket clientSocket = new DatagramSocket();
 		
@@ -275,12 +269,7 @@ public class DnsClient {
 		
 		String modifiedSentence = new String(receivePacket.getData());
 		
-		System.out.println(modifiedSentence);
-		
-		
-		/** QUERY SUMMARY **/
-		
-		
+		//TODO: parse packet received accoding to the lab specification
 		
 		
 		
