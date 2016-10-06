@@ -13,12 +13,17 @@ import java.util.Random;
 
 public class DnsClient {
 	
+
 	static byte[] server;
+	static String sn;
 	static String name;
 	static String recordType = "A";
 	static Integer timeout = 5;
 	static Integer maxRetries = 3;
 	static Integer port = 53;
+	static Integer i=0;
+	static Integer p=1;
+	static String[] labels; 
 	
 	static int sendDataIndex = -1;
 	static byte[] sendData = new byte[1024];
@@ -26,47 +31,83 @@ public class DnsClient {
 	
 	public static void main(String[] args) throws Exception {
 		
-		//Parse user input
 		for(String s: args){
+			i++;
+			if (p==1){
 			switch(s.substring(0, 1)){
 				case "@":
-					String serverName[] = s.split(" ");
-					server = serverName[0].getBytes();
-					name = serverName[1];
+					server = args[i-1].substring(1).getBytes();
+					name = args[i];
+					System.out.println(server);
+					System.out.println(name);
+					labels = name.split("\\.");
 					break;
 				
 				case "-":
-					switch(s.substring(1,3)){
-					case "t ":
-						timeout = Integer.parseInt(s.substring(3));
+					switch(s.substring(1)){
+					case "t":
+						if (isNumeric(args[i])){
+						timeout = Integer.parseInt(args[i]);
+						//System.out.println(args[i]);
+						}
+						else{
+							//System.out.println("Incorrect Input");
+							p=0;
+						}
 						break;
 					
-					case "r ":
-						maxRetries =  Integer.parseInt(s.substring(3));
+					case "r":
+						if (isNumeric(args[i])){
+						maxRetries =  Integer.parseInt(args[i]);
+						//System.out.println(maxRetries);
+					}
+					else{
+						//System.out.println("Incorrect Input");
+						p=0;
+					}
 						break;
 						
 					case "p ":
-						port = Integer.parseInt(s.substring(3));
+						if (isNumeric(args[i])){
+						port = Integer.parseInt(args[i]);
+						//System.out.println(port);
+					}
+					else{
+						//System.out.println("Incorrect Input");
+						p=0;
+					}
+						
 						break;
 						
 					case "mx":
-						recordType = s.substring(3);
+						recordType = "MX";
+						//System.out.println(recordType);
 						break;
 						
 					case "ns":
-						recordType = s.substring(3);
+						recordType = "NS";
+						//System.out.println(recordType);
+						break;
+						
+					case "A":
+						recordType = "A";
+						//System.out.println(recordType);
 						break;
 						
 					default:
-						System.out.println("Invalid input!");
-						return;
+					return;
 					}	
 					break;
+					
 				
 				default:
-					System.out.println("Invalid input!");
-					return;
+					//System.out.println("Invalid input!");
+					//return;
 			
+			}
+			}
+			else{
+				break;
 			}
 		}
 		
@@ -229,5 +270,18 @@ public class DnsClient {
 		
 		
 		
+	}
+	
+	public static boolean isNumeric(String str)  
+	{  
+	  try  
+	  {  
+	    double d = Double.parseDouble(str);  
+	  }  
+	  catch(NumberFormatException nfe)  
+	  {  
+	    return false;  
+	  }  
+	  return true;  
 	}
 }
