@@ -25,7 +25,7 @@ public class DnsClient {
 	static Integer p=1;
 	static String[] labels; 
 	
-	static int sendDataIndex = -1;
+	static int sendDataIndex = 0;
 	static byte[] sendData = new byte[1024];
 	static byte[] receiveData = new byte[1024];
 	
@@ -199,6 +199,8 @@ public class DnsClient {
 			for(int i = 0; i< labelLength; i++){
 				sendData[sendDataIndex++] = (byte) s.charAt(i);
 			}
+			
+			sendData[sendDataIndex++] = 0;
 		}
 		
 		//TODO
@@ -264,7 +266,11 @@ public class DnsClient {
 		
 		String modifiedSentence = new String(receivePacket.getData());
 		
-		//TODO: parse packet received accoding to the lab specification
+		System.out.println(modifiedSentence);
+		
+		/** QUERY SUMMARY **/
+		
+		
 		
 		
 		
