@@ -24,6 +24,8 @@ public class DnsClient {
 	static Integer i=0;
 	static Integer p=1;
 	static String[] labels; 
+	static String[] serverS;
+	static byte[] serverB;
 	
 	static int sendDataIndex = 0;
 	static byte[] sendData = new byte[1024];
@@ -46,6 +48,9 @@ public class DnsClient {
 					System.out.println(server);
 					System.out.println(name);
 					labels = name.split("\\.");
+					for (int z=0; z<4; z++){
+						serverB[z]=(byte)Integer.parseInt(serverS[z]);
+						}
 					break;
 				
 				case "-":
