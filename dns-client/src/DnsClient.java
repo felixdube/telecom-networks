@@ -25,7 +25,7 @@ public class DnsClient {
 	static Integer p=1;
 	static String[] labels; 
 	static String[] serverS;
-	static byte[] serverB;
+	static byte[] serverB = new byte[4];
 	
 	static int sendDataIndex = 0;
 	static byte[] sendData = new byte[1024];
@@ -44,12 +44,14 @@ public class DnsClient {
 			switch(s.substring(0, 1)){
 				case "@":
 					server = args[i-1].substring(1).getBytes();
+					serverS= args[i-1].substring(1).split("\\.");
 					name = args[i];
-					System.out.println(server);
-					System.out.println(name);
+					//System.out.println(server);
+					//System.out.println(name);
 					labels = name.split("\\.");
 					for (int z=0; z<4; z++){
-						serverB[z]=(byte)Integer.parseInt(serverS[z]);
+					System.out.println(serverS[z]);
+					serverB[z]=(byte)Integer.parseInt(serverS[z]);
 						}
 					break;
 				
@@ -265,7 +267,7 @@ public class DnsClient {
 		//create client socket
 		DatagramSocket clientSocket = new DatagramSocket();
 		
-		InetAddress IPAddress = InetAddress.getByAddress(server);
+		InetAddress IPAddress = InetAddress.getByAddress(serverB);
 		
 		//create datagram
 		DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, port);
