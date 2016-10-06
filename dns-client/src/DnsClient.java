@@ -212,10 +212,10 @@ public class DnsClient {
 				sendData[sendDataIndex++] = (byte) s.charAt(i);
 			}
 			
-			sendData[sendDataIndex++] = 0;
 		}
 		
-		//TODO
+		sendData[sendDataIndex++] = 0;
+		
 		
 		/*
 		 * 	Question 2
