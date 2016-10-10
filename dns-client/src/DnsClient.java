@@ -30,6 +30,7 @@ public class DnsClient {
 	static int sendDataIndex = 0;
 	static byte[] sendData = new byte[1024];
 	static byte[] receiveData = new byte[1024];
+	static int Active=0;
 	
 	
 	public static void main(String[] args) throws Exception {
@@ -46,11 +47,8 @@ public class DnsClient {
 					server = args[i-1].substring(1).getBytes();
 					serverS= args[i-1].substring(1).split("\\.");
 					name = args[i];
-					//System.out.println(server);
-					//System.out.println(name);
 					labels = name.split("\\.");
 					for (int z=0; z<4; z++){
-					System.out.println(serverS[z]);
 					serverB[z]=(byte)Integer.parseInt(serverS[z]);
 						}
 					break;
@@ -60,10 +58,8 @@ public class DnsClient {
 					case "t":
 						if (isNumeric(args[i])){
 						timeout = Integer.parseInt(args[i]);
-						//System.out.println(args[i]);
 						}
 						else{
-							//System.out.println("Incorrect Input");
 							p=0;
 						}
 						break;
@@ -71,10 +67,8 @@ public class DnsClient {
 					case "r":
 						if (isNumeric(args[i])){
 						maxRetries =  Integer.parseInt(args[i]);
-						//System.out.println(maxRetries);
 					}
 					else{
-						//System.out.println("Incorrect Input");
 						p=0;
 					}
 						break;
@@ -82,10 +76,8 @@ public class DnsClient {
 					case "p ":
 						if (isNumeric(args[i])){
 						port = Integer.parseInt(args[i]);
-						//System.out.println(port);
 					}
 					else{
-						//System.out.println("Incorrect Input");
 						p=0;
 					}
 						
@@ -93,17 +85,14 @@ public class DnsClient {
 						
 					case "mx":
 						recordType = "MX";
-						//System.out.println(recordType);
 						break;
 						
 					case "ns":
 						recordType = "NS";
-						//System.out.println(recordType);
 						break;
 						
 					case "A":
 						recordType = "A";
-						//System.out.println(recordType);
 						break;
 						
 					default:
@@ -113,10 +102,7 @@ public class DnsClient {
 					
 				
 				default:
-					//System.out.println("Invalid input!");
-					//return;
-			
-			}
+		}
 			}
 			else{
 				break;
@@ -280,18 +266,161 @@ public class DnsClient {
 		//read datagram from server
 		clientSocket.receive(receivePacket);
 		
-		String modifiedSentence = new String(receivePacket.getData());
+		//String modifiedSentence = new String(receivePacket.getData());
 		
-		System.out.println(modifiedSentence);
-		
+		//System.out.println(modifiedSentence);
+		decode(receivePacket.getData());
 		
 		/** QUERY SUMMARY **/
 		
+				
+	}
+	
+	
+	public static void decode(byte[] temp){
+		int Active=0;
+	    
+		StringBuilder output = new StringBuilder();
+		
+		//Extract packet ID
+		StringBuilder IDs = new StringBuilder();
+	    byte ID[]={temp[0],temp[1]};
+		for (byte b : ID) {
+	        IDs.append(String.format("%02X ", b));
+	    }
+		
+		//Decode Packet Header
+		int QR= getBit(7,temp[2],1);
+		int OPCODE = getBit(3,temp[2],4);
+		int AA = getBit(2,temp[2],1);
+		String AAs;
+		if (AA==1){
+			AAs = "auth";
+		} else{ AAs = "nonauth";}
+		int TC = getBit(1,temp[2],1);
+		int RD = getBit(0,temp[2],1);
+		int RA = getBit(7,temp[3],1);
+		int Z = getBit(4,temp[3],3);
+		int RCODE = getBit(0,temp[3],4);
+		int QDCOUNT = (temp[4] & 0xff << 8) + temp[5];
+		int ANCOUNT = (temp[6] & 0xff << 8) + temp[7];
+		int NSCOUNT = (temp[8] & 0xff << 8) + temp[9];
+		int ARCOUNT = (temp[10] & 0xff << 8) + temp[11];
+		
+		//Decode Question
+		Active=12;
+		String[] QNAMEtemp = domExtract(temp,Active,'n');
+		String QNAME = QNAMEtemp[0];
+		Active= Integer.parseInt(QNAMEtemp[1]);
+		int QTYPE= (temp[Active] & 0xff << 8) + temp[Active+1];
+		Active+=2;
+		int QCLASS = (temp[Active] & 0xff << 8) + temp[Active+1];
+		Active+=2;
+
+		
+		//decode Answers
+		if (ANCOUNT>0){
+		output.append("***Answer Section (" + ANCOUNT+ " records)***"+ '\n');
+
+		}
+		for (int i =0; i<ANCOUNT; i++){
+		String[] ttemp = domExtract(temp,Active,'n');
+		String tempt= ttemp[0];
+		Active = Integer.parseInt(ttemp[1]);
+		int TYPE = (temp[Active] << 8) + temp[Active+1];
+		Active+=2;
+		int CLASS = (temp[Active] << 8) + temp[Active+1];
+		Active+=2;
+		long TTL = (temp[Active] & 0xFF << 24) + (temp[Active+1] & 0xFF << 16) +(temp[Active+2] & 0xFF << 8) + temp[Active+3] & 0xFF;	
+		Active+=4;
+		int RDLENGTH = (temp[Active] << 8) + temp[Active+1];
+		Active+=2;
+		if (TYPE==1){
+			StringBuilder IP = new StringBuilder();
+			for (int j =0; j<RDLENGTH;j++ ){
+				IP.append((int) temp[Active+j] & 0xFF);
+				IP.append(".");
+			}
+			Active+=RDLENGTH;
+			output.append("IP" + '\t' + IP.deleteCharAt(IP.lastIndexOf(".")).toString() + '\t' + TTL + '\t' + AAs + '\n');
+
+		}
+		
+		if (TYPE==2){
+			ttemp = domExtract(temp,Active,'n');
+			tempt= ttemp[0];
+			output.append("NS" + '\t' + tempt +'\t' + TTL+'\t' + AAs+'\n');
+			Active+=RDLENGTH;	
+		}
+		
+		if (TYPE==15){
+			int PREF = (temp[Active] & 0xFF << 8) + (temp[Active+1] & 0xFF);
+			Active+=2;
+			ttemp = domExtract(temp,Active,'n');
+			tempt= ttemp[0];
+			output.append("MX" + '\t' + tempt +'\t'+ PREF +'\t' + TTL+'\t' + AAs+'\n');
+			Active+=RDLENGTH-2;
+			}
+		
+		if(TYPE==5){
+			ttemp = domExtract(temp,Active,'n');
+			tempt= ttemp[0];
+			output.append("CNAME" + '\t' + tempt +'\t' + TTL+'\t' + AAs+'\n');
+			Active+=RDLENGTH;	
+		}
 		
 		
 		
 		
+		}
+		System.out.println(output.toString());
 		
+
+		
+	}
+	
+	
+	public static int getBit(int position, byte SB, int Length){
+		return  ((SB & 0xFF) >> position) & ((int) Math.pow(2, Length) - 1);
+	}
+	
+	public static String[] domExtract (byte temp[],int Activet, char mode){
+		
+		StringBuilder domName = new StringBuilder();
+		
+		for (int i=Activet; i>1; i++){
+			int c = (int) temp[i];
+			if (c!=0){
+				if ((c & 0xC0) == 0xC0){
+					String t = domExtract(temp, (int) ((temp[i] & 0x3f)  << 8) + temp[i+1], 'p')[0];
+					domName.append(t);
+					if (mode=='n'){
+						Active=i+2;
+					}
+					i=0;
+				}
+				else{
+					for (int j=0; j<c; j++){
+					domName.append((char) temp[i+j+1] ) ;
+				}
+			i=i+c;
+				if (mode=='n'){
+				Active=i+2;
+				}
+				domName.append(".");
+				}
+				
+			}
+			else{
+				i=0;
+			}
+		}
+		
+		while ((domName.lastIndexOf(".")==domName.length()-1)){
+			domName.deleteCharAt(domName.length()-1);
+		}
+String tempS[] = {domName.toString(),Integer.toString(Active)};
+		return tempS;
 		
 	}
 	
