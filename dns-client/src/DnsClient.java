@@ -280,6 +280,15 @@ public class DnsClient {
 				break;
 			}
 			catch(SocketTimeoutException e ){//if timed out while waiting for response
+				
+				//create a new ID
+				ID = new byte[2];	//random
+				r = new Random();
+				r.nextBytes(ID);
+				
+				sendData[sendDataIndex++] = ID[0];
+				sendData[sendDataIndex++] = ID[1];
+				
 				continue;//continue trying
 			}
 		}
