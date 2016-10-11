@@ -256,7 +256,7 @@ public class DnsClient {
 		InetAddress IPAddress = InetAddress.getByAddress(serverB);
 		
 		//create datagram
-		DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, port);
+		DatagramPacket sendPacket;
 
 		
 		clientSocket.setSoTimeout(timeout * 1000);//Set socket timeout in milliseconds
@@ -268,6 +268,7 @@ public class DnsClient {
 
 		
 		while(tryCount<maxRetries && recieveSuccess==0){ //start try loop until out of retries or response is received
+			sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, port);
 			DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);//create datagram
 			clientSocket.send(sendPacket);//send query
 			tStart = System.currentTimeMillis();//mark the time the packet was sent
@@ -286,8 +287,8 @@ public class DnsClient {
 				r = new Random();
 				r.nextBytes(ID);
 				
-				sendData[sendDataIndex++] = ID[0];
-				sendData[sendDataIndex++] = ID[1];
+				sendData[0] = ID[0];
+				sendData[1] = ID[1];
 				
 				continue;//continue trying
 			}
