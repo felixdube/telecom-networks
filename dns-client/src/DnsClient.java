@@ -257,26 +257,45 @@ public class DnsClient {
 		
 		//create datagram
 		DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, port);
+
 		
-		//send datagram
-		clientSocket.send(sendPacket);
+		clientSocket.setSoTimeout(timeout * 1000);//Set socket timeout in milliseconds
 		
-		DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+		int tryCount=0;//counter for number of retries
+		int recieveSuccess = 0;//0 indicates try failure and 1 indicates success - used to break the try loop
+		long tStart=0;//Absolute time in milliseconds when query was sent
+		long tElapsed=0;//Differential time in milliseconds between query and response
+
 		
-		//read datagram from server
-		clientSocket.receive(receivePacket);
+		while(tryCount<maxRetries && recieveSuccess==0){ //start try loop until out of retries or response is received
+			DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);//create datagram
+			clientSocket.send(sendPacket);//send query
+			tStart = System.currentTimeMillis();//mark the time the packet was sent
+			tryCount++;//increment the number of tries performed
+			try{
+				clientSocket.receive(receivePacket);//try receiving response
+				tElapsed = System.currentTimeMillis() - tStart;//calculate elapsed time between query and response
+				decode(receivePacket.getData());//pass response packet to decode method
+				recieveSuccess=1;//mark response success to break try loop
+				break;
+			}
+			catch(SocketTimeoutException e ){//if timed out while waiting for response
+				continue;//continue trying
+			}
+		}
 		
-		//String modifiedSentence = new String(receivePacket.getData());
-		
-		//System.out.println(modifiedSentence);
-		decode(receivePacket.getData());
-		
-		/** QUERY SUMMARY **/
+		if(recieveSuccess==0){ //if no response was received in the allowed time and all retries were exceeded
+			System.out.println("Error" + '\t' + "Maximum number of retries " + tryCount + " exceeded");
+		}
+		else{//if response was successfully received
+			System.out.println("Response received after " + (tElapsed/1000.00) + " seconds (" + tryCount  +" retries)");
+		}
+
 		
 				
 	}
 	
-	
+	/** This method decodes DNS answer packets and parses the pertinent information into a String for display **/
 	public static void decode(byte[] temp){
 		int Active=0;
 	    
@@ -368,22 +387,85 @@ public class DnsClient {
 			output.append("CNAME" + '\t' + tempt +'\t' + TTL+'\t' + AAs+'\n');
 			Active+=RDLENGTH;	
 		}
-		
-		
-		
-		
 		}
+		
+		for (int i =0; i<NSCOUNT; i++){
+		String[] ttemp = domExtract(temp,Active,'n');
+		Active = Integer.parseInt(ttemp[1]);
+		Active+=2;
+		Active+=2;
+		Active+=4;
+		int RDLENGTH = (temp[Active] << 8) + temp[Active+1];
+		Active+=2;
+		Active+=RDLENGTH;
+	}
+		
+		if (ARCOUNT>0){
+			output.append("***Additional Section (" + ARCOUNT+ " records)***"+ '\n');
+	
+			}
+			for (int i =0; i<ARCOUNT; i++){
+			String[] ttemp = domExtract(temp,Active,'n');
+			String tempt= ttemp[0];
+			Active = Integer.parseInt(ttemp[1]);
+			int TYPE = (temp[Active] << 8) + temp[Active+1];
+			Active+=2;
+			int CLASS = (temp[Active] << 8) + temp[Active+1];
+			Active+=2;
+			long TTL = (temp[Active] & 0xFF << 24) + (temp[Active+1] & 0xFF << 16) +(temp[Active+2] & 0xFF << 8) + temp[Active+3] & 0xFF;	
+			Active+=4;
+			int RDLENGTH = (temp[Active] << 8) + temp[Active+1];
+			Active+=2;
+			if (TYPE==1){
+				StringBuilder IP = new StringBuilder();
+				for (int j =0; j<RDLENGTH;j++ ){
+					IP.append((int) temp[Active+j] & 0xFF);
+					IP.append(".");
+				}
+				Active+=RDLENGTH;
+				output.append("IP" + '\t' + IP.deleteCharAt(IP.lastIndexOf(".")).toString() + '\t' + TTL + '\t' + AAs + '\n');
+	
+			}
+			
+			if (TYPE==2){
+				ttemp = domExtract(temp,Active,'n');
+				tempt= ttemp[0];
+				output.append("NS" + '\t' + tempt +'\t' + TTL+'\t' + AAs+'\n');
+				Active+=RDLENGTH;	
+			}
+			
+			if (TYPE==15){
+				int PREF = (temp[Active] & 0xFF << 8) + (temp[Active+1] & 0xFF);
+				Active+=2;
+				ttemp = domExtract(temp,Active,'n');
+				tempt= ttemp[0];
+				output.append("MX" + '\t' + tempt +'\t'+ PREF +'\t' + TTL+'\t' + AAs+'\n');
+				Active+=RDLENGTH-2;
+				}
+			
+			if(TYPE==5){
+				ttemp = domExtract(temp,Active,'n');
+				tempt= ttemp[0];
+				output.append("CNAME" + '\t' + tempt +'\t' + TTL+'\t' + AAs+'\n');
+				Active+=RDLENGTH;	
+			}}
+			
 		System.out.println(output.toString());
 		
 
 		
 	}
 	
-	
+	/** This method extracts bits from within a byte and returns them as an int. **/
+	/** Needs the byte itself, the index of the first bit needed (LSB=0) and the number of bits **/
 	public static int getBit(int position, byte SB, int Length){
 		return  ((SB & 0xFF) >> position) & ((int) Math.pow(2, Length) - 1);
 	}
 	
+	/** This method extracts domain names from packets. **/
+	/** It needs the packet itself, index of the first byte of the required domain name as well as a mode setting. 'n' for normal, 'p' for pointer  **/
+	/** The method is called with mode = 'n' externally, but it calls itself recursively to resolve pointers with mode = 'p' **/
+	/** Returns a string[] = { extracted domain name, cursor index of the next part of the packet } , since domain names are of variable length**/
 	public static String[] domExtract (byte temp[],int Activet, char mode){
 		
 		StringBuilder domName = new StringBuilder();
@@ -424,6 +506,7 @@ String tempS[] = {domName.toString(),Integer.toString(Active)};
 		
 	}
 	
+	/** This method returns true if the given string represents a numerical value and false otherwise **/
 	public static boolean isNumeric(String str)  
 	{  
 	  try  
