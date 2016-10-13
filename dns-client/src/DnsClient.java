@@ -242,12 +242,14 @@ public class DnsClient {
 		sendData[sendDataIndex++] = QCLASS[1];
 		
 		
-		
-		
 		/*********************************/
 		/******** SENDING PACKETS ********/
 		/*********************************/
 		
+		//Print query information
+		System.out.println("DnsClient sending request for " + name);
+		System.out.println("Server: " + serverS[0]+"." +serverS[1]+"." +serverS[2]+"." + serverS[3]);
+		System.out.println("Request type: " + recordType + '\n');
 		//create client socket
 		DatagramSocket clientSocket = new DatagramSocket();
 		
@@ -263,6 +265,7 @@ public class DnsClient {
 		int recieveSuccess = 0;//0 indicates try failure and 1 indicates success - used to break the try loop
 		long tStart=0;//Absolute time in milliseconds when query was sent
 		long tElapsed=0;//Differential time in milliseconds between query and response
+		String output="";
 
 		
 		while(tryCount<maxRetries && recieveSuccess==0){ //start try loop until out of retries or response is received
@@ -270,11 +273,17 @@ public class DnsClient {
 			DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);//create datagram
 			clientSocket.send(sendPacket);//send query
 			tStart = System.currentTimeMillis();//mark the time the packet was sent
-			tryCount++;//increment the number of tries performed
+			
 			try{
 				clientSocket.receive(receivePacket);//try receiving response
 				tElapsed = System.currentTimeMillis() - tStart;//calculate elapsed time between query and response
-				decode(receivePacket.getData());//pass response packet to decode method
+				while (1>0){
+					output= decode(receivePacket.getData(),sendData);//pass response packet to decode method
+					if (!output.equals("IDMM")){
+						break;
+					}
+				}
+				
 				recieveSuccess=1;//mark response success to break try loop
 				break;
 			}
@@ -287,55 +296,86 @@ public class DnsClient {
 				
 				sendData[0] = ID[0];
 				sendData[1] = ID[1];
-				
+				tryCount++;//increment the number of tries performed
 				continue;//continue trying
 			}
 		}
 		
 		if(recieveSuccess==0){ //if no response was received in the allowed time and all retries were exceeded
-			System.out.println("Error" + '\t' + "Maximum number of retries " + tryCount + " exceeded");
+			System.out.println("ERROR" + '\t' + "Maximum number of retries " + tryCount + " exceeded");
 		}
 		else{//if response was successfully received
-			System.out.println("Response received after " + (tElapsed/1000.00) + " seconds (" + tryCount  +" retries)");
+			System.out.println("Response received after " + (tElapsed/1000.00) + " seconds (" + tryCount  +" retries)"+ '\n');
+			System.out.println(output);
 		}
 
 		
-				
+		
 	}
 	
 	/*decode(byte[] temp)
 	 * @brief	Decodes DNS answer packets and parses the pertinent information into a String for display 
 	 * @param	temp:	packet being received
 	 */
-	public static void decode(byte[] temp){
+	public static String decode(byte[] temp, byte[] query){
+		try{
 		int Active=0;
-	    
+		
 		StringBuilder output = new StringBuilder();
 		
-		//Extract packet ID
-		StringBuilder IDs = new StringBuilder();
-	    byte ID[]={temp[0],temp[1]};
-		for (byte b : ID) {
-	        IDs.append(String.format("%02X ", b));
-	    }
+		//Compare packet ID
+		byte IDr[]={temp[0],temp[1]};
+		byte IDq[]={query[0],query[1]};
+		if (IDr[0]!=IDq[0] || IDr[1]!=IDq[1]){
+			return "IDMM";
+		}
+		
+
+		
 		
 		//Decode Packet Header
-		int QR= getBit(7,temp[2],1);
-		int OPCODE = getBit(3,temp[2],4);
-		int AA = getBit(2,temp[2],1);
+		int QR= getBit(7,temp[2],1);//0 for query, 1 for response
+		if (QR==0){
+			return "Error"+'\t'+"Unexpected Response"+'\t'+ "Repsonse Expected; Query Recieved";
+		}
+		
+		int OPCODEr = getBit(3,temp[2],4);//kind of query sent
+		int OPCODEq = getBit(3,query[2],4);//kind of query received
+		if (OPCODEr!=OPCODEq){
+			return "Error"+'\t'+"Unexpected Response"+'\t'+"OPCODE Mismatch";
+		}
+		
+		
+		int AA = getBit(2,temp[2],1);//0 for nonauth, 1 for auth
 		String AAs;
 		if (AA==1){
 			AAs = "auth";
 		} else{ AAs = "nonauth";}
-		int TC = getBit(1,temp[2],1);
-		int RD = getBit(0,temp[2],1);
-		int RA = getBit(7,temp[3],1);
-		int Z = getBit(4,temp[3],3);
-		int RCODE = getBit(0,temp[3],4);
-		int QDCOUNT = (temp[4] & 0xff << 8) + temp[5];
-		int ANCOUNT = (temp[6] & 0xff << 8) + temp[7];
-		int NSCOUNT = (temp[8] & 0xff << 8) + temp[9];
-		int ARCOUNT = (temp[10] & 0xff << 8) + temp[11];
+		int TC = getBit(1,temp[2],1);//0 for non truncated, 1 for truncated 
+		int RD = getBit(0,temp[2],1);//0 for recursion not required, 1 for recursion required
+		int RA = getBit(7,temp[3],1);//0 for recursion not supported, 1 for recursion supported
+		if (RD==1 && RA==0){
+			output.append("ERROR"+'\t'+ "Recursion Not supported"+'\n');
+		}
+		int Z = getBit(4,temp[3],3);//N/A
+		int RCODE = getBit(0,temp[3],4);//0 for no error, 1 for format error, 2 for server failure, 3 or name error, 4 for not implemented, 5 for refused
+		switch(RCODE){
+		case 1: //String error="Error"+'\t'+"Format Error";
+		return "Error"+'\t'+"Format Error";
+		case 2: //String error="Error"+'\t'+"Server Failure";
+		return "Error"+'\t'+"Server Failure";
+		case 3: //String error="Error"+'\t'+"Name Error";
+		return "Not Found";
+		case 4: //String error="Error"+'\t'+"Not Implemented";
+		return "Error"+'\t'+"Not Implemented";
+		case 5: //String error="Error"+'\t'+"Refused";
+		return "Error"+'\t'+"Refused";
+		}
+		
+		int QDCOUNT = (temp[4] & 0xff << 8) + temp[5];//number of queries
+		int ANCOUNT = (temp[6] & 0xff << 8) + temp[7];//number of answer RRs
+		int NSCOUNT = (temp[8] & 0xff << 8) + temp[9];//number of authoritative RRs
+		int ARCOUNT = (temp[10] & 0xff << 8) + temp[11];//number of additional answer RRs
 		
 		//Decode Question
 		Active=12;
@@ -346,76 +386,18 @@ public class DnsClient {
 		Active+=2;
 		int QCLASS = (temp[Active] & 0xff << 8) + temp[Active+1];
 		Active+=2;
-
+		
+		if (ANCOUNT+ARCOUNT ==0)
+		{
+		return "NOT FOUND";	
+		}	
 		
 		//decode Answers
 		if (ANCOUNT>0){
-		output.append("***Answer Section (" + ANCOUNT+ " records)***"+ '\n');
+			output.append("***Answer Section (" + ANCOUNT+ " records)***"+ '\n');
 
 		}
 		for (int i =0; i<ANCOUNT; i++){
-		String[] ttemp = domExtract(temp,Active,'n');
-		String tempt= ttemp[0];
-		Active = Integer.parseInt(ttemp[1]);
-		int TYPE = (temp[Active] << 8) + temp[Active+1];
-		Active+=2;
-		int CLASS = (temp[Active] << 8) + temp[Active+1];
-		Active+=2;
-		long TTL = (temp[Active] & 0xFF << 24) + (temp[Active+1] & 0xFF << 16) +(temp[Active+2] & 0xFF << 8) + temp[Active+3] & 0xFF;	
-		Active+=4;
-		int RDLENGTH = (temp[Active] << 8) + temp[Active+1];
-		Active+=2;
-		if (TYPE==1){
-			StringBuilder IP = new StringBuilder();
-			for (int j =0; j<RDLENGTH;j++ ){
-				IP.append((int) temp[Active+j] & 0xFF);
-				IP.append(".");
-			}
-			Active+=RDLENGTH;
-			output.append("IP" + '\t' + IP.deleteCharAt(IP.lastIndexOf(".")).toString() + '\t' + TTL + '\t' + AAs + '\n');
-
-		}
-		
-		if (TYPE==2){
-			ttemp = domExtract(temp,Active,'n');
-			tempt= ttemp[0];
-			output.append("NS" + '\t' + tempt +'\t' + TTL+'\t' + AAs+'\n');
-			Active+=RDLENGTH;	
-		}
-		
-		if (TYPE==15){
-			int PREF = (temp[Active] & 0xFF << 8) + (temp[Active+1] & 0xFF);
-			Active+=2;
-			ttemp = domExtract(temp,Active,'n');
-			tempt= ttemp[0];
-			output.append("MX" + '\t' + tempt +'\t'+ PREF +'\t' + TTL+'\t' + AAs+'\n');
-			Active+=RDLENGTH-2;
-			}
-		
-		if(TYPE==5){
-			ttemp = domExtract(temp,Active,'n');
-			tempt= ttemp[0];
-			output.append("CNAME" + '\t' + tempt +'\t' + TTL+'\t' + AAs+'\n');
-			Active+=RDLENGTH;	
-		}
-		}
-		
-		for (int i =0; i<NSCOUNT; i++){
-		String[] ttemp = domExtract(temp,Active,'n');
-		Active = Integer.parseInt(ttemp[1]);
-		Active+=2;
-		Active+=2;
-		Active+=4;
-		int RDLENGTH = (temp[Active] << 8) + temp[Active+1];
-		Active+=2;
-		Active+=RDLENGTH;
-	}
-		
-		if (ARCOUNT>0){
-			output.append("***Additional Section (" + ARCOUNT+ " records)***"+ '\n');
-	
-			}
-			for (int i =0; i<ARCOUNT; i++){
 			String[] ttemp = domExtract(temp,Active,'n');
 			String tempt= ttemp[0];
 			Active = Integer.parseInt(ttemp[1]);
@@ -435,7 +417,7 @@ public class DnsClient {
 				}
 				Active+=RDLENGTH;
 				output.append("IP" + '\t' + IP.deleteCharAt(IP.lastIndexOf(".")).toString() + '\t' + TTL + '\t' + AAs + '\n');
-	
+
 			}
 			
 			if (TYPE==2){
@@ -443,6 +425,7 @@ public class DnsClient {
 				tempt= ttemp[0];
 				output.append("NS" + '\t' + tempt +'\t' + TTL+'\t' + AAs+'\n');
 				Active+=RDLENGTH;	
+				
 			}
 			
 			if (TYPE==15){
@@ -452,19 +435,91 @@ public class DnsClient {
 				tempt= ttemp[0];
 				output.append("MX" + '\t' + tempt +'\t'+ PREF +'\t' + TTL+'\t' + AAs+'\n');
 				Active+=RDLENGTH-2;
-				}
+			}
 			
 			if(TYPE==5){
 				ttemp = domExtract(temp,Active,'n');
 				tempt= ttemp[0];
 				output.append("CNAME" + '\t' + tempt +'\t' + TTL+'\t' + AAs+'\n');
 				Active+=RDLENGTH;	
-			}}
-			
-		System.out.println(output.toString());
+			}
+		}
+
+		
+		
+		for (int i =0; i<NSCOUNT; i++){
+			String[] ttemp = domExtract(temp,Active,'n');
+			Active = Integer.parseInt(ttemp[1]);
+			Active+=8;
+			int RDLENGTH = (temp[Active] << 8) + temp[Active+1];
+			Active+=2;
+			Active+=RDLENGTH;
+		}
 		
 
 		
+		if (ARCOUNT>0){
+			output.append('\n'+"***Additional Section (" + ARCOUNT+ " records)***"+ '\n');
+			
+		}
+		for (int i =0; i<ARCOUNT; i++){
+			String[] ttemp = domExtract(temp,Active,'n');
+			String tempt= ttemp[0];
+			Active = Integer.parseInt(ttemp[1]);
+			int TYPE = (temp[Active] << 8) + temp[Active+1];
+			Active+=2;
+			int CLASS = (temp[Active] << 8) + temp[Active+1];
+			Active+=2;
+			long TTL = (temp[Active] & 0xFF << 24) + (temp[Active+1] & 0xFF << 16) +(temp[Active+2] & 0xFF << 8) + temp[Active+3] & 0xFF;	
+			Active+=4;
+			int RDLENGTH = (temp[Active] << 8) + temp[Active+1];
+			Active+=2;
+			if (TYPE==1){
+				StringBuilder IP = new StringBuilder();
+				for (int j =0; j<RDLENGTH;j++ ){
+					IP.append((int) temp[Active+j] & 0xFF);
+					IP.append(".");
+				}
+				Active+=RDLENGTH;
+				output.append("IP" + '\t' + IP.deleteCharAt(IP.lastIndexOf(".")).toString() + '\t' + TTL + '\t' + AAs + '\n');
+
+			}
+			
+			if (TYPE==2){
+				ttemp = domExtract(temp,Active,'n');
+				tempt= ttemp[0];
+				output.append("NS" + '\t' + tempt +'\t' + TTL+'\t' + AAs+'\n');
+				Active+=RDLENGTH;	
+
+				
+			}
+			
+			if (TYPE==15){
+				int PREF = (temp[Active] & 0xFF << 8) + (temp[Active+1] & 0xFF);
+				Active+=2;
+				ttemp = domExtract(temp,Active,'n');
+				tempt= ttemp[0];
+				output.append("MX" + '\t' + tempt +'\t'+ PREF +'\t' + TTL+'\t' + AAs+'\n');
+				Active+=RDLENGTH-2;
+
+			}
+			
+			if(TYPE==5){
+				ttemp = domExtract(temp,Active,'n');
+				tempt= ttemp[0];
+				output.append("CNAME" + '\t' + tempt +'\t' + TTL+'\t' + AAs+'\n');
+				Active+=RDLENGTH;	
+
+			}
+		}
+			return output.toString();
+		
+		}
+		catch(Exception e){
+			return "ERROR" + '\t' + "Unexpected Response" + "UNKNOWN EXCEPTION OCCURED WHEN DECODING REPSONSE" + '\n';
+		}
+
+			
 	}
 	
 	/* getBit(int position, byte SB, int Length)
@@ -474,44 +529,43 @@ public class DnsClient {
 	 * 			length: number of bits
 	 *  @return	bits extracted in integer
 	 */
-	public static int getBit(int position, byte SB, int length){
-		return  ((SB & 0xFF) >> position) & ((int) Math.pow(2, length) - 1);
+	public static int getBit(int position, byte SB, int Length){
+		return  ((SB & 0xFF) >> position) & ((int) Math.pow(2, Length) - 1);
 	}
-	
 	
 	/*	domExtract(byte temp[],int active, char mode)
 	 *  @brief 	This method extracts domain names from packets.
 	 *  		The method is called with mode = 'n' externally, 
 	 *  		but it calls itself recursively to resolve pointers with mode = 'p'
 	 *  @param	temp[]:	packet
-	 *  		active: first byte of the required domain name
+	 *  		activeT: first byte of the required domain name
 	 *  		mode: mode setting
 	 *  @return	 extracted domain name and cursor index of the next part of the packet in an array
 	 */
-	public static String[] domExtract (byte temp[],int active, char mode){
+	public static String[] domExtract (byte temp[],int activeT, char mode){
 		
 		StringBuilder domName = new StringBuilder();
 		
-		for (int i=active; i>1; i++){
+		for (int i=activeT; i>1; i++){
 			int c = (int) temp[i];
 			if (c!=0){
 				if ((c & 0xC0) == 0xC0){
 					String t = domExtract(temp, (int) ((temp[i] & 0x3f)  << 8) + temp[i+1], 'p')[0];
 					domName.append(t);
 					if (mode=='n'){
-						active=i+2;
+						Active=i+2;
 					}
 					i=0;
 				}
 				else{
 					for (int j=0; j<c; j++){
-					domName.append((char) temp[i+j+1] ) ;
-				}
-			i=i+c;
-				if (mode=='n'){
-				active=i+2;
-				}
-				domName.append(".");
+						domName.append((char) temp[i+j+1] ) ;
+					}
+					i=i+c;
+					if (mode=='n'){
+						Active=i+2;
+					}
+					domName.append(".");
 				}
 				
 			}
