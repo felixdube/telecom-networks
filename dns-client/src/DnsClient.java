@@ -21,8 +21,7 @@ public class DnsClient {
 	static Integer timeout = 5;
 	static Integer maxRetries = 3;
 	static Integer port = 53;
-	static Integer i=0;
-	static Integer p=1;
+	static Integer argsIndex=-1;
 	static String[] labels; 
 	static String[] serverS;
 	static byte[] serverB = new byte[4];
@@ -40,74 +39,73 @@ public class DnsClient {
 		/************************************/
 		
 		for(String s: args){
-			i++;
-			if (p==1){
+			argsIndex++;
 			switch(s.substring(0, 1)){
+
+				//DNS server IP & server name
 				case "@":
-					server = args[i-1].substring(1).getBytes();
-					serverS= args[i-1].substring(1).split("\\.");
-					name = args[i];
+					server = args[argsIndex].substring(1).getBytes();
+					serverS= args[argsIndex].substring(1).split("\\.");
+					name = args[argsIndex + 1];
 					labels = name.split("\\.");
 					for (int z=0; z<4; z++){
-					serverB[z]=(byte)Integer.parseInt(serverS[z]);
-						}
+						serverB[z]=(byte)Integer.parseInt(serverS[z]);
+					}
 					break;
 				
+					
 				case "-":
 					switch(s.substring(1)){
-					case "t":
-						if (isNumeric(args[i])){
-						timeout = Integer.parseInt(args[i]);
-						}
-						else{
-							p=0;
-						}
-						break;
-					
-					case "r":
-						if (isNumeric(args[i])){
-						maxRetries =  Integer.parseInt(args[i]);
-					}
-					else{
-						p=0;
-					}
-						break;
 						
-					case "p ":
-						if (isNumeric(args[i])){
-						port = Integer.parseInt(args[i]);
-					}
-					else{
-						p=0;
-					}
+						//timeout
+						case "t":
+							if (isNumeric(args[argsIndex + 1])){
+								timeout = Integer.parseInt(args[argsIndex + 1]);
+							} else{
+								inputError("timeout");
+							}
+							break;
 						
-						break;
+						//max-retries
+						case "r":
+							if (isNumeric(args[argsIndex + 1])){
+								maxRetries =  Integer.parseInt(args[argsIndex + 1]);
+							} else{
+								inputError("maxRetries");
+							}
+							break;
 						
-					case "mx":
-						recordType = "MX";
-						break;
-						
-					case "ns":
-						recordType = "NS";
-						break;
-						
-					case "A":
-						recordType = "A";
-						break;
-						
-					default:
-					return;
+						//port 
+						case "p":
+							if (isNumeric(args[argsIndex + 1])){
+								port = Integer.parseInt(args[argsIndex + 1]);
+							} else{
+								inputError("port");
+							}
+							
+							break;
+							
+						case "mx":
+							recordType = "MX";
+							break;
+							
+						case "ns":
+							recordType = "NS";
+							break;
+							
+						case "A":
+							recordType = "A";
+							break;
+							
+						default:
+							inputError("invalidArg");
 					}	
 					break;
 					
-				
 				default:
-		}
-			}
-			else{
-				break;
 			}
 		}
+
 		
 		
 		/*************************/
@@ -305,7 +303,10 @@ public class DnsClient {
 				
 	}
 	
-	/** This method decodes DNS answer packets and parses the pertinent information into a String for display **/
+	/*decode(byte[] temp)
+	 * @brief	Decodes DNS answer packets and parses the pertinent information into a String for display 
+	 * @param	temp:	packet being received
+	 */
 	public static void decode(byte[] temp){
 		int Active=0;
 	    
@@ -466,28 +467,39 @@ public class DnsClient {
 		
 	}
 	
-	/** This method extracts bits from within a byte and returns them as an int. **/
-	/** Needs the byte itself, the index of the first bit needed (LSB=0) and the number of bits **/
-	public static int getBit(int position, byte SB, int Length){
-		return  ((SB & 0xFF) >> position) & ((int) Math.pow(2, Length) - 1);
+	/* getBit(int position, byte SB, int Length)
+	 * @brief	extracts bits from within a byte
+	 * @param	position: index of the first bit
+	 * 			SB: byte itself
+	 * 			length: number of bits
+	 *  @return	bits extracted in integer
+	 */
+	public static int getBit(int position, byte SB, int length){
+		return  ((SB & 0xFF) >> position) & ((int) Math.pow(2, length) - 1);
 	}
 	
-	/** This method extracts domain names from packets. **/
-	/** It needs the packet itself, index of the first byte of the required domain name as well as a mode setting. 'n' for normal, 'p' for pointer  **/
-	/** The method is called with mode = 'n' externally, but it calls itself recursively to resolve pointers with mode = 'p' **/
-	/** Returns a string[] = { extracted domain name, cursor index of the next part of the packet } , since domain names are of variable length**/
-	public static String[] domExtract (byte temp[],int Activet, char mode){
+	
+	/*	domExtract(byte temp[],int active, char mode)
+	 *  @brief 	This method extracts domain names from packets.
+	 *  		The method is called with mode = 'n' externally, 
+	 *  		but it calls itself recursively to resolve pointers with mode = 'p'
+	 *  @param	temp[]:	packet
+	 *  		active: first byte of the required domain name
+	 *  		mode: mode setting
+	 *  @return	 extracted domain name and cursor index of the next part of the packet in an array
+	 */
+	public static String[] domExtract (byte temp[],int active, char mode){
 		
 		StringBuilder domName = new StringBuilder();
 		
-		for (int i=Activet; i>1; i++){
+		for (int i=active; i>1; i++){
 			int c = (int) temp[i];
 			if (c!=0){
 				if ((c & 0xC0) == 0xC0){
 					String t = domExtract(temp, (int) ((temp[i] & 0x3f)  << 8) + temp[i+1], 'p')[0];
 					domName.append(t);
 					if (mode=='n'){
-						Active=i+2;
+						active=i+2;
 					}
 					i=0;
 				}
@@ -497,7 +509,7 @@ public class DnsClient {
 				}
 			i=i+c;
 				if (mode=='n'){
-				Active=i+2;
+				active=i+2;
 				}
 				domName.append(".");
 				}
@@ -508,15 +520,20 @@ public class DnsClient {
 			}
 		}
 		
-		while ((domName.lastIndexOf(".")==domName.length()-1)){
+		while ((domName.lastIndexOf(".")==domName.length()-1) && domName.lastIndexOf(".")>0){
 			domName.deleteCharAt(domName.length()-1);
 		}
-String tempS[] = {domName.toString(),Integer.toString(Active)};
+		String tempS[] = {domName.toString(),Integer.toString(Active)};
 		return tempS;
 		
 	}
 	
-	/** This method returns true if the given string represents a numerical value and false otherwise **/
+	/*	isNumeric()
+	 *  @brief	check is a string is a number
+	 *  @param	str: string to be checked
+	 *  @return	true: if the string is a number
+	 *  		false: if the string is not a number
+	 */
 	public static boolean isNumeric(String str)  
 	{  
 	  try  
@@ -528,5 +545,32 @@ String tempS[] = {domName.toString(),Integer.toString(Active)};
 	    return false;  
 	  }  
 	  return true;  
+	}
+	
+	
+	/* inputError(String error)
+	 * @brief	print an error message and exit the program when there is an error at the user input
+	 * @param	error: error type
+	 */
+	public static void inputError(String error){
+		
+		switch(error){
+			case "timeout":
+				System.out.println("Invalid timeout argument! \n\n");
+				break;
+			case "maxRetries":
+				System.out.println("Invalid max-retries argument! \n\n");
+				break;
+			case "port":
+				System.out.println("Invalid port argument! \n\n");
+				break;
+			case "invalidArg":
+				System.out.println("Invalid argument! \n\n");
+				break;
+		}
+		
+		System.out.println("Usage: \n java DnsClient [-t timeout] [-r max-retries] [-p port] [-mx|-ns] @server name");
+		System.exit(0);
+		
 	}
 }
