@@ -613,19 +613,19 @@ public class DnsClient {
 		
 		switch(error){
 			case "timeout":
-				System.out.println("\nInvalid timeout argument! \n");
+				System.out.println("\nERROR\tIncorrect input syntax: Invalid timeout argument. \n");
 				break;
 			case "maxRetries":
-				System.out.println("\nInvalid max-retries argument! \n");
+				System.out.println("\nERROR\tIncorrect input syntax: Invalid max-retries argument. \n");
 				break;
 			case "port":
-				System.out.println("\nInvalid port argument! \n");
+				System.out.println("\nERROR\tIncorrect input syntax: Invalid port argument. \n");
 				break;
 			case "invalidArg":
-				System.out.println("\nInvalid argument! \n");
+				System.out.println("\nERROR\tIncorrect input syntax: Invalid argument. \n");
 				break;
 			case "timeoutZero":
-				System.out.println("\nInvalid timeout argument! Timeout value needs to be greater than 0.\n");
+				System.out.println("\nERROR\tIncorrect input syntax: Invalid timeout argument. Timeout value needs to be greater than 0.\n");
 				break;
 		}
 		
