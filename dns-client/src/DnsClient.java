@@ -55,7 +55,7 @@ public class DnsClient {
 		}
 		
 		
-		System.out.println(args.length);
+
 		
 		for(String s: args){
 			argsIndex++;
