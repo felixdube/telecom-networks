@@ -61,6 +61,9 @@ public class DnsClient {
 						case "t":
 							if (isNumeric(args[argsIndex + 1])){
 								timeout = Integer.parseInt(args[argsIndex + 1]);
+								if(timeout == 0){
+									inputError("timeoutZero");
+								}
 							} else{
 								inputError("timeout");
 							}
@@ -268,7 +271,7 @@ public class DnsClient {
 		String output="";
 
 		
-		while(tryCount<maxRetries && recieveSuccess==0){ //start try loop until out of retries or response is received
+		while(tryCount<maxRetries+1 && recieveSuccess==0){ //start try loop until out of retries or response is received
 			sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, port);
 			DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);//create datagram
 			clientSocket.send(sendPacket);//send query
@@ -302,7 +305,7 @@ public class DnsClient {
 		}
 		
 		if(recieveSuccess==0){ //if no response was received in the allowed time and all retries were exceeded
-			System.out.println("ERROR" + '\t' + "Maximum number of retries " + tryCount + " exceeded");
+			System.out.println("ERROR" + '\t' + "Maximum number of retries " + (tryCount-1) + " exceeded");
 		}
 		else{//if response was successfully received
 			System.out.println("Response received after " + (tElapsed/1000.00) + " seconds (" + tryCount  +" retries)"+ '\n');
@@ -610,20 +613,23 @@ public class DnsClient {
 		
 		switch(error){
 			case "timeout":
-				System.out.println("Invalid timeout argument! \n\n");
+				System.out.println("\nInvalid timeout argument! \n");
 				break;
 			case "maxRetries":
-				System.out.println("Invalid max-retries argument! \n\n");
+				System.out.println("\nInvalid max-retries argument! \n");
 				break;
 			case "port":
-				System.out.println("Invalid port argument! \n\n");
+				System.out.println("\nInvalid port argument! \n");
 				break;
 			case "invalidArg":
-				System.out.println("Invalid argument! \n\n");
+				System.out.println("\nInvalid argument! \n");
+				break;
+			case "timeoutZero":
+				System.out.println("\nInvalid timeout argument! Timeout value needs to be greater than 0.\n");
 				break;
 		}
 		
-		System.out.println("Usage: \n java DnsClient [-t timeout] [-r max-retries] [-p port] [-mx|-ns] @server name");
+		System.out.println("Usage: \n java DnsClient [-t timeout] [-r max-retries] [-p port] [-mx|-ns] @server name\n");
 		System.exit(0);
 		
 	}
