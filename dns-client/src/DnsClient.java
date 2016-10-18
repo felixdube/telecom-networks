@@ -30,6 +30,7 @@ public class DnsClient {
 	static byte[] sendData = new byte[1024];
 	static byte[] receiveData = new byte[1024];
 	static int Active=0;
+	static boolean serverIPFound = false;
 	
 	
 	public static void main(String[] args) throws Exception {
@@ -37,6 +38,24 @@ public class DnsClient {
 		/************************************/
 		/******** USER INPUT PARSING ********/
 		/************************************/
+		for(String s: args){
+			switch(s.substring(0, 1)){
+				case "@":
+					serverIPFound = true;
+					break;
+			}	
+		}
+		
+		if(serverIPFound == false){
+			inputError("noServer");
+		}
+		
+		if(args.length < 2){
+			inputError("tooFewArg");
+		}
+		
+		
+		System.out.println(args.length);
 		
 		for(String s: args){
 			argsIndex++;
@@ -44,9 +63,16 @@ public class DnsClient {
 
 				//DNS server IP & server name
 				case "@":
+					if(s.length() == 1){
+						//inputError("noServer");
+					}
 					server = args[argsIndex].substring(1).getBytes();
 					serverS= args[argsIndex].substring(1).split("\\.");
-					name = args[argsIndex + 1];
+					if(argsIndex + 1 == args.length){
+						inputError("noName");
+					} else {
+						name = args[argsIndex + 1];
+					}
 					labels = name.split("\\.");
 					for (int z=0; z<4; z++){
 						serverB[z]=(byte)Integer.parseInt(serverS[z]);
@@ -626,6 +652,15 @@ public class DnsClient {
 				break;
 			case "timeoutZero":
 				System.out.println("\nERROR\tIncorrect input syntax: Invalid timeout argument. Timeout value needs to be greater than 0.\n");
+				break;
+			case "noName":
+				System.out.println("\nERROR\tIncorrect input syntax: domain name required\n");
+				break;
+			case "noServer":
+				System.out.println("\nERROR\tIncorrect input syntax: DNS server IP required\n");
+				break;
+			case "tooFewArg":
+				System.out.println("\nERROR\tIncorrect input syntax: DNS server IP and domain name required\n");
 				break;
 		}
 		
