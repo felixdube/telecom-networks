@@ -276,7 +276,7 @@ public class DnsClient {
 		/*********************************/
 		
 		//Print query information
-		System.out.println("DnsClient sending request for " + name);
+		System.out.println('\n'+"DnsClient sending request for " + name);
 		System.out.println("Server: " + serverS[0]+"." +serverS[1]+"." +serverS[2]+"." + serverS[3]);
 		System.out.println("Request type: " + recordType + '\n');
 		//create client socket
@@ -384,7 +384,7 @@ public class DnsClient {
 		int RD = getBit(0,temp[2],1);//0 for recursion not required, 1 for recursion required
 		int RA = getBit(7,temp[3],1);//0 for recursion not supported, 1 for recursion supported
 		if (RD==1 && RA==0){
-			output.append("ERROR"+'\t'+ "Recursion Not supported"+'\n');
+			output.append("ERROR"+'\t'+ "Recursion Not supported"+'\n'+'\n');
 		}
 		int Z = getBit(4,temp[3],3);//N/A
 		int RCODE = getBit(0,temp[3],4);//0 for no error, 1 for format error, 2 for server failure, 3 or name error, 4 for not implemented, 5 for refused
